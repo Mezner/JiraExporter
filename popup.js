@@ -1,11 +1,63 @@
 /*
+ * Handles direct interactions with Evernote
+ */
+var EvernoteRepository = function () {
+    var devToken = 'DEV TOKEN HERE'
+    var userTransport = new Thrift.Transport("http://www.evernote.com/edam/user");
+    var userProtocol = new Thrift.Protocol(userTransport);
+    var userStore = new UserStoreClient(userProtocol, userProtocol);
+    var noteStoreUrl = userStore.getNoteStoreUrl(devToken);
+    var notesTransport = new Thrift.Transport(noteStoreUrl);
+    var notesProtocol = new Thrift.Protocol(notesTransport);
+    var noteStore = new NoteStoreClient(notesProtocol, notesProtocol);
+    //var notesTransport = new Thrift.Transport(Eventnote.Auth.oauth.getParameter(Eventnote.Auth.note_store_url_param));
+    //var notesProtocol = new Thrift.Protocol(notesTransport);
+    //var noteStore = new NoteStoreClient(notesProtocol, notesProtocol);
+    if (!noteStore) {
+        console.log("connection failure during getting note store");
+    }
+
+    getNotebooks = function () {
+        return noteStore.listNotebooks(devToken);//Eventnote.Auth.get_auth_token());
+    };
+
+    getTags = function () {
+        return noteStore.listTags(devToken);//Eventnote.Auth.get_auth_token());
+    };
+
+    createTag = function (tag) {
+        noteStore.createTag(devToken, tag);
+    };
+
+    createNote = function(title, description, notebookGuid, tagGuids) {
+        var notebook = noteStore.getDefaultNotebook(devToken, note);//Eventnote.Auth.get_auth_token(), note);
+        var note = new Note();
+        note.title = title;
+        var content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+            + "<!DOCTYPE en-note SYSTEM \"http://xml.evernote.com/pub/enml2.dtd\"><en-note>";
+        content += description;
+        content += "</en-note>";
+        note.content = content;
+        note.tagGuids = tagGuids;
+        note.notebookGuid = notebookGuid;
+        localStorage["jiraNotebook"] = notebookGuid;
+        var response = noteStore.createNote(devToken, note);//Eventnote.Auth.get_auth_token(), note);
+    }
+
+    return {
+        createNote: createNote,
+        getTags: getTags,
+        getNotebooks: getNotebooks
+    }
+};
+
+/*
  * Handles all logic within the popup.
  */
-var Popup = function(selectors) {
+var Popup = function(selectors, repository) {
     var ticket = null;
     var tags = null;
     var ticketTagNames = [];
-    var devToken = 'DEV TOKEN HERE';
 
     /*
      * Sanitize options used when cleaning the description.
@@ -65,8 +117,7 @@ var Popup = function(selectors) {
     };
 
     loadNotebooks = function() {
-        store = getNoteStore();
-        notebooks = store.listNotebooks(devToken);//Eventnote.Auth.get_auth_token());
+        notebooks = repository.getNotebooks();
         notebookGuid = localStorage["jiraNotebook"];
         $.each(notebooks, function() {
             notebookOption = $("<option />").val(this.guid).text(this.name);
@@ -81,8 +132,7 @@ var Popup = function(selectors) {
      * Loads tags from the user's Evernote account.
      */
     loadTags = function() {
-        store = getNoteStore();
-        tags = store.listTags(devToken);//Eventnote.Auth.get_auth_token());
+        tags = repository.getTags();
     };
 
     /*
@@ -106,13 +156,13 @@ var Popup = function(selectors) {
         cleanedDescription = formatDescription(ticket);
         cleanedDescription = descriptionHeader + cleanedDescription + "<hr />";
         tagGuids = getTagGuids();
-        createNote(noteTitle, cleanedDescription, tagGuids);
+        notebookGuid = $(selectors.notebook).val();
+        repository.createNote(noteTitle, cleanedDescription, notebookGuid, tagGuids);
         window.close();
     };
 
     getTagGuids = function() {
         console.log("get note guids");
-        store = getNoteStore();
         tagGuids = [];
         $.each(ticketTagNames, function() {
             tagName = this;
@@ -128,7 +178,7 @@ var Popup = function(selectors) {
                 console.log("creating tag: " + tagName);
                 newTag = new Tag();
                 newTag.name = tagName;
-                newTag = store.createTag(devToken, newTag);//Eventnote.Auth.get_auth_token(), newTag);
+                newTag = repository.createTag(newTag);//Eventnote.Auth.get_auth_token(), newTag);
                 tagGuids.push(newTag.guid);
             }
         });
@@ -195,39 +245,6 @@ var Popup = function(selectors) {
         return cleanedDescription;
     };
 
-    createNote = function(title, description, tagGuids) {
-        var noteStore = getNoteStore();
-        var notebook = noteStore.getDefaultNotebook(devToken, note);//Eventnote.Auth.get_auth_token(), note);
-        var note = new Note();
-        note.title = title;
-        var content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-            + "<!DOCTYPE en-note SYSTEM \"http://xml.evernote.com/pub/enml2.dtd\"><en-note>";
-        content += description;
-        content += "</en-note>";
-        note.content = content;
-        note.tagGuids = tagGuids;
-        notebookGuid = $(selectors.notebook).val();
-        note.notebookGuid = notebookGuid;
-        localStorage["jiraNotebook"] = notebookGuid;
-        var response = noteStore.createNote(devToken, note);//Eventnote.Auth.get_auth_token(), note);
-    }
-
-    getNoteStore = function() {
-        var userTransport = new Thrift.Transport("http://www.evernote.com/edam/user");
-        var userProtocol = new Thrift.Protocol(userTransport);
-        var userStore = new UserStoreClient(userProtocol, userProtocol);
-        var noteStoreUrl = userStore.getNoteStoreUrl(devToken);
-        var notesTransport = new Thrift.Transport(noteStoreUrl);
-        var notesProtocol = new Thrift.Protocol(notesTransport);
-        var noteStore = new NoteStoreClient(notesProtocol, notesProtocol);
-        //var notesTransport = new Thrift.Transport(Eventnote.Auth.oauth.getParameter(Eventnote.Auth.note_store_url_param));
-        //var notesProtocol = new Thrift.Protocol(notesTransport);
-        //var noteStore = new NoteStoreClient(notesProtocol, notesProtocol);
-        if (!noteStore) {
-            console.log("connection failure during getting note store");
-        }
-        return noteStore;
-    }
 
     /*
      * Executes the page script responsible for parsing ticket details.
@@ -267,5 +284,6 @@ popupSelectors = {
     createNote: "#createNote",
     cancelNote: "#cancelNote"
 };
-var popup = new Popup(popupSelectors);
+var evernoteRepository = new EvernoteRepository();
+var popup = new Popup(popupSelectors, evernoteRepository);
 popup.init();
