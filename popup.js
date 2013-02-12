@@ -2,7 +2,8 @@
  * Handles direct interactions with Evernote
  */
 var EvernoteRepository = function () {
-    var devToken = 'DEV TOKEN HERE'
+    var devToken = ''
+    var sourceApplication = "JiraExporter";
     var userTransport = new Thrift.Transport("http://www.evernote.com/edam/user");
     var userProtocol = new Thrift.Protocol(userTransport);
     var userStore = new UserStoreClient(userProtocol, userProtocol);
@@ -40,6 +41,9 @@ var EvernoteRepository = function () {
         note.content = content;
         note.tagGuids = tagGuids;
         note.notebookGuid = notebookGuid;
+        noteAttributes = new NoteAttributes();
+        noteAttributes.sourceApplication = sourceApplication;
+        note.attributes = noteAttributes;
         localStorage["jiraNotebook"] = notebookGuid;
         var response = noteStore.createNote(devToken, note);//Eventnote.Auth.get_auth_token(), note);
     }
