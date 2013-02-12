@@ -1,7 +1,7 @@
-Evernote Jira Chrome Plugin
+Jira Exporter
 ========================
 
-Parses Jira tickets into Evernote notes via a Chrome plugin. THIS IS AN INCOMPLETE, PROTOTYPE PROJECT.
+Jira Exporter is a Chrome plugin that translates Jira tickets into Evernote notes. This application is a work in progress.
 
 Setup
 --------
