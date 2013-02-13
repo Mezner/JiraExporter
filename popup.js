@@ -2,36 +2,36 @@
  * Handles direct interactions with Evernote
  */
 var EvernoteRepository = function () {
-    var devToken = ''
+    var authToken;
+    var noteStore;
     var sourceApplication = "JiraExporter";
-    var userTransport = new Thrift.Transport("http://www.evernote.com/edam/user");
-    var userProtocol = new Thrift.Protocol(userTransport);
-    var userStore = new UserStoreClient(userProtocol, userProtocol);
-    var noteStoreUrl = userStore.getNoteStoreUrl(devToken);
-    var notesTransport = new Thrift.Transport(noteStoreUrl);
-    var notesProtocol = new Thrift.Protocol(notesTransport);
-    var noteStore = new NoteStoreClient(notesProtocol, notesProtocol);
-    //var notesTransport = new Thrift.Transport(Eventnote.Auth.oauth.getParameter(Eventnote.Auth.note_store_url_param));
-    //var notesProtocol = new Thrift.Protocol(notesTransport);
-    //var noteStore = new NoteStoreClient(notesProtocol, notesProtocol);
-    if (!noteStore) {
-        console.log("connection failure during getting note store");
-    }
+
+    init = function () {
+        $(function () {
+            authToken = Eventnote.Auth.get_auth_token();
+            var notesTransport = new Thrift.Transport(Eventnote.Auth.oauth.getParameter(Eventnote.Auth.note_store_url_param));
+            var notesProtocol = new Thrift.Protocol(notesTransport);
+            noteStore = new NoteStoreClient(notesProtocol, notesProtocol);
+            if (!noteStore) {
+                console.log("connection failure during getting note store");
+            }
+        });
+    };
 
     getNotebooks = function () {
-        return noteStore.listNotebooks(devToken);//Eventnote.Auth.get_auth_token());
+        return noteStore.listNotebooks(authToken);
     };
 
     getTags = function () {
-        return noteStore.listTags(devToken);//Eventnote.Auth.get_auth_token());
+        return noteStore.listTags(authToken);
     };
 
     createTag = function (tag) {
-        noteStore.createTag(devToken, tag);
+        return noteStore.createTag(authToken, tag);
     };
 
     createNote = function(title, description, notebookGuid, tagGuids) {
-        var notebook = noteStore.getDefaultNotebook(devToken, note);//Eventnote.Auth.get_auth_token(), note);
+        var notebook = noteStore.getDefaultNotebook(authToken, note);
         var note = new Note();
         note.title = title;
         var content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
@@ -45,13 +45,15 @@ var EvernoteRepository = function () {
         noteAttributes.sourceApplication = sourceApplication;
         note.attributes = noteAttributes;
         localStorage["jiraNotebook"] = notebookGuid;
-        var response = noteStore.createNote(devToken, note);//Eventnote.Auth.get_auth_token(), note);
+        var response = noteStore.createNote(authToken, note);
     }
 
     return {
+        init: init,
         createNote: createNote,
         getTags: getTags,
-        getNotebooks: getNotebooks
+        getNotebooks: getNotebooks,
+        createTag: createTag
     }
 };
 
@@ -182,7 +184,7 @@ var Popup = function(selectors, repository) {
                 console.log("creating tag: " + tagName);
                 newTag = new Tag();
                 newTag.name = tagName;
-                newTag = repository.createTag(newTag);//Eventnote.Auth.get_auth_token(), newTag);
+                newTag = repository.createTag(newTag);
                 tagGuids.push(newTag.guid);
             }
         });
@@ -289,5 +291,6 @@ popupSelectors = {
     cancelNote: "#cancelNote"
 };
 var evernoteRepository = new EvernoteRepository();
+evernoteRepository.init();
 var popup = new Popup(popupSelectors, evernoteRepository);
 popup.init();
