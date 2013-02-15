@@ -30,7 +30,7 @@ var EvernoteRepository = function () {
         return noteStore.createTag(authToken, tag);
     };
 
-    createNote = function(title, description, notebookGuid, tagGuids) {
+    createNote = function(key, title, description, notebookGuid, tagGuids) {
         var notebook = noteStore.getDefaultNotebook(authToken, note);
         var note = new Note();
         note.title = title;
@@ -43,6 +43,9 @@ var EvernoteRepository = function () {
         note.notebookGuid = notebookGuid;
         noteAttributes = new NoteAttributes();
         noteAttributes.sourceApplication = sourceApplication;
+        noteAttributes.applicationData = new LazyMap();
+        noteAttributes.applicationData.fullMap = {};
+        noteAttributes.applicationData.fullMap[key] = key;
         note.attributes = noteAttributes;
         localStorage["jiraNotebook"] = notebookGuid;
         var response = noteStore.createNote(authToken, note);
@@ -163,7 +166,7 @@ var Popup = function(selectors, repository) {
         cleanedDescription = descriptionHeader + cleanedDescription + "<hr />";
         tagGuids = getTagGuids();
         notebookGuid = $(selectors.notebook).val();
-        repository.createNote(noteTitle, cleanedDescription, notebookGuid, tagGuids);
+        repository.createNote(ticket.key, noteTitle, cleanedDescription, notebookGuid, tagGuids);
         window.close();
     };
 
