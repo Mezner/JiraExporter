@@ -30,9 +30,14 @@ var EvernoteRepository = function () {
         return noteStore.createTag(authToken, tag);
     };
 
-    createNote = function(key, title, description, notebookGuid, tagGuids) {
+    createNote = function(key, title, description, notebookGuid, tagGuids, previousNote) {
         var notebook = noteStore.getDefaultNotebook(authToken, note);
-        var note = new Note();
+        var note = previousNote;
+        var notePreviouslyExisted = note != null;
+        if (!notePreviouslyExisted) {
+            console.log("creating new note");
+            var note = new Note();
+        }
         note.title = title;
         var content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
             + "<!DOCTYPE en-note SYSTEM \"http://xml.evernote.com/pub/enml2.dtd\"><en-note>";
@@ -48,15 +53,43 @@ var EvernoteRepository = function () {
         noteAttributes.applicationData.fullMap[key] = key;
         note.attributes = noteAttributes;
         localStorage["jiraNotebook"] = notebookGuid;
-        var response = noteStore.createNote(authToken, note);
+        if (notePreviouslyExisted) {
+            console.log("update note");
+            var response = noteStore.updateNote(authToken, note);
+            console.log(response);
+        }
+        else {
+            console.log("create note");
+            noteStore.createNote(authToken, note);
+        }
     }
+
+    findNoteForIssueKey = function(key) {
+        noteFilter = new NoteFilter();
+        console.log("created note filter");
+        noteFilter.inactive = false;
+        // ordering settings don't matter as we're only getting one note, but they
+        // are required.
+        //noteFilter.notebookGuid = "a2a4e6a2-fdba-4e6a-b3ba-799c21a6e2ff";
+        noteFilter.order = 1;
+        noteFilter.ascending = true;
+        noteFilter.words = "applicationData:" + key + " sourceApplication:" + sourceApplication;
+        notesFound = noteStore.findNotes(authToken, noteFilter, 0, 1);
+        if (notesFound.notes.length == 1) {
+            foundNote = notesFound.notes[0];
+            console.log("previous note found: " + foundNote.guid);
+            return foundNote;
+        }
+        return null;
+    };
 
     return {
         init: init,
         createNote: createNote,
         getTags: getTags,
         getNotebooks: getNotebooks,
-        createTag: createTag
+        createTag: createTag,
+        findNoteForIssueKey: findNoteForIssueKey
     }
 };
 
@@ -67,6 +100,7 @@ var Popup = function(selectors, repository) {
     var ticket = null;
     var tags = null;
     var ticketTagNames = [];
+    var previousNote = null;
 
     /*
      * Sanitize options used when cleaning the description.
@@ -166,7 +200,7 @@ var Popup = function(selectors, repository) {
         cleanedDescription = descriptionHeader + cleanedDescription + "<hr />";
         tagGuids = getTagGuids();
         notebookGuid = $(selectors.notebook).val();
-        repository.createNote(ticket.key, noteTitle, cleanedDescription, notebookGuid, tagGuids);
+        repository.createNote(ticket.key, noteTitle, cleanedDescription, notebookGuid, tagGuids, previousNote);
         window.close();
     };
 
@@ -202,6 +236,10 @@ var Popup = function(selectors, repository) {
         ticket = parsedTicket;
         noteTitle = ticket.key + " - " + ticket.title;
         getTagNames(ticket);
+        previousNote = repository.findNoteForIssueKey(ticket.key);
+        if (previousNote != null) {
+            $(selectors.createNote).val("Sync Note");
+        }
         $(selectors.key).val(ticket.key);
         $(selectors.title).val(noteTitle);
         $(selectors.tags).val(ticketTagNames.join(', '));
